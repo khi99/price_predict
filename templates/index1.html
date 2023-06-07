@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html>
+    
+    
+<head>
+<title>Apt Search</title>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=0b4i7pdkhw"></script>
+
+
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+    }
+    
+    #map {
+        width: 100vw;
+        height: 100vh;
+    }
+    
+    #mapContainer {
+        display: flex;
+    }
+    
+    #searchContainer {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 2;
+    }
+    
+    #searchBox {
+        width: 200px;
+        padding: 8px;
+        border: none;
+        border-radius: 4px;
+        font-size: 16px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    #suggestionsContainer {
+        position: absolute;
+        top: 60px;
+        left: 20px;
+        z-index: 2;
+        width: 200px;
+        background-color: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    #suggestionsList {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    #suggestionsList li {
+        padding: 6px 10px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    
+    #suggestionsList li:hover {
+        background-color: #f5f5f5;
+    }
+    
+    #priceInfo {
+        display: none;
+        position: fixed;
+        top: 100px;
+        left: 20px;
+        background-color: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        font-weight: bold;
+    }
+    
+    #graphImage {
+        max-width: 100%;
+        height: auto;
+    }
+
+    #area-buttons {
+        position: absolute;
+        height: auto;
+        bottom: 20px;
+        left: 20px;
+        z-index: 2;
+        display: flex;
+        justify-content: flex-start;
+        font-family: NanumGothic; 
+        font-size: 13px; 
+        font-weight: 600;
+    }
+    
+    .area-button {
+        background-color: #fff;
+        color: #333;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 12px;
+        margin-right: 10px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    
+    .area-button:hover {
+        background-color: #f5f5f5;
+    }
+
+    #loading-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background-color: #f5f5f5;
+        z-index: 9999;
+      }
+      
+      #loading-progress {
+        height: 100%;
+        width: calc(0% - 20px);;
+        background-color: #5963D9;
+      }
+    
+
+</style>
+<script>
+
+    var map;
+    var markers = []; // 마커를 저장할 배열
+    // 특정 위치의 좌표 배열
+
+    
+
+    function initMap() {
+        map = new naver.maps.Map('map', {
+            center: new naver.maps.LatLng(37.5665, 126.9780), // 초기 지도 중심 좌표 설정
+            zoom: 14 // 초기 줌 레벨 설정
+            //zoomControl: true // 줌 컨트롤 사용
+        });
+    
+        showMarkersWithinBounds();
+
+        map.addListener('idle', function () {
+            showMarkersWithinBounds();
+        });
+    }
+
+    function showMarkersWithinBounds() {
+        clearMarkers();
+        var bounds = map.getBounds();
+        var swLatLng = bounds.getSW();  // 남서쪽 좌표
+        var neLatLng = bounds.getNE();  // 북동쪽 좌표
+        var zoomLevel = map.getZoom();  // 지도의 줌 레벨
+    
+        var boundsString = swLatLng.y + ',' + neLatLng.y + ',' + swLatLng.x + ',' + neLatLng.x;
+        
+        $.ajax({
+            type: 'GET',
+            url: '/get_positions',
+            data: { 'bounds': boundsString, 'zoom': zoomLevel },
+            success: function (response) {
+                var positions = response.positions;
+                clearMarkers();
+                console.log(positions); // 응답 데이터 확인
+                for (var i = 0; i < positions.length; i++) {
+                    var position = positions[i];
+                    //console.log(position) // 개별 위치 확인
+                    addMarker(position);
+                }
+                console.log('Request succeeded'); // 요청이 성공적으로 완료되었을 때 출력
+            },
+            error: function (xhr, status, error) {
+                console.log('Request failed:', error); // 요청이 실패했을 때 출력
+            }
+        });
+    }
+
+    function addMarker(position) {
+        var markerOptions = {
+            icon: {
+                content: '<div style="background-color: #5963D9; font-family: NanumGothic; width: fit-content; padding: 8px; box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); height: auto; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (map.getZoom() > 15 ? '<span style="font-weight: 400; font-size: 12px; display: block; text-align: center;">' + position['전용면적(㎡)'].toFixed(2) + '㎡</span><span>' + (position['거래금액(만원)'] / 10000).toFixed(1) + '억</span>' : position.name) + '</div>',
+                size: new naver.maps.Size(60, 40),
+                anchor: new naver.maps.Point(30, 20)
+            },
+            position: new naver.maps.LatLng(position.y, position.x),
+            map: map
+        };
+    
+        var marker = new naver.maps.Marker(markerOptions);
+        var apartmentName = position.단지명;
+        console.log(position.단지명)
+        
+        var infowindow = new naver.maps.InfoWindow({
+            content: '<div style="background-color: #fff; font-family: NanumGothic; padding: 10px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); font-size: 14px; font-weight: 600; color: #333; border: 1px solid #ccc;">' + (map.getZoom() > 15 ? position.단지명 : ((map.getZoom() > 12 && map.getZoom() <= 15) ? position.name : position.si)) + '</div>',
+            disableAnchor: true,
+            pixelOffset: new naver.maps.Point(0, -10)
+        });
+    
+        naver.maps.Event.addListener(marker, 'mouseover', function () {
+            infowindow.open(map, marker);
+        });
+    
+        naver.maps.Event.addListener(marker, 'mouseout', function () {
+            infowindow.close();
+        });
+    
+        naver.maps.Event.addListener(marker, 'click', function () {
+            if (map.getZoom() > 15) {
+                
+                console.log()
+                getArea(apartmentName);
+                moveMapToCoordinates(position.y, position.x);
+            }
+    
+            else if (map.getZoom() > 13 && map.getZoom() <= 15) {
+                clearMarkers();
+                moveMapToCoordinates(position.y, position.x);
+                map.setZoom(16);
+            }
+
+            else if (map.getZoom() <= 13) {
+                clearMarkers();
+                moveMapToCoordinates(position.y, position.x);
+                map.setZoom(14);
+            }
+        });
+    
+        markers.push(marker);
+    }
+    
+
+    function clearMarkers() {
+        for (var i = 0; i < markers.length; i++) {
+            markers[i].setMap(null);
+        }
+        markers = [];
+    }
+
+    function getFuturePrice(apartmentName, area) {
+        $('#loading-progress').width('0%');
+        $('#loading-bar').show();
+        $.ajax({
+          type: 'POST',
+          url: '/get_future_price',
+          data: { 'apartmentName': apartmentName, 'area': area },
+          xhr: function () {
+            var xhr = $.ajaxSettings.xhr();
+			xhr.upload.onprogress = function(e){
+                console.log(e.loaded)
+				var per = e.loaded * 100 / e.total;
+                console.log(per)
+                per = per.toFixed(1);
+                $("#loading-progress").css("width", "calc(" + per + "% - 20px)");
+			};
+			return xhr;
+          },
+          success: function (response) {
+            console.log('image success');
+            var encodedImage = response.graphImage;
+            
+            // Base64로 인코딩된 이미지를 데이터 URL 형식으로 변환
+            var imageSrc = 'data:image/png;base64,' + encodedImage;
+
+            // 이미지 태그의 src 속성에 데이터 URL 설정
+            $('#graphImage').attr('src', imageSrc);
+            $('#priceInfo').show();
+            $('#area-buttons').show();
+            $('#graphImage').show();
+            $('#closeButton').show();
+
+             // x 버튼 클릭 시 호출되는 함수 추가
+            $('#closeButton').click(function () {
+                $('#priceInfo').hide();
+                $('#area-buttons').hide();
+                $('#graphImage').hide();
+                $('#closeButton').hide();
+    });
+
+          },
+          complete: function () {
+            // 이미지 로딩 바 숨기기
+            $('#loading-bar').hide();
+          }
+        });
+      }
+
+     
+
+    function getArea(apartment) {
+        // 로딩 바 보이기
+        //$('#loading-bar').show();
+        
+        //console.log('function_called');
+        $.ajax({
+          type: 'POST',
+          url: '/get_areas',
+          data: { 'apartment': apartment },
+          success: function (response) {
+            //console.log('ajax_called');
+            var areas = response.areas;
+            var areaButtons = '';
+      
+            $('#area-buttons').off('click', '.area-button');
+            
+            for (var i = 0; i < areas.length; i++) {
+              var area = areas[i];
+              areaButtons += '<button class="area-button" data-area="' + area + '">' + area + ' ㎡</button> ';
+            }
+            
+            getFuturePrice(apartment, areas[0]);
+      
+            $('#area-buttons').html(areaButtons);
+        
+            $('#area-buttons').on('click', '.area-button', function () {
+              var selectedArea = $(this).data('area');
+              var selectedApartment = apartment; // 클로저 문제 해결을 위해 apartment 값을 새로운 변수에 저장
+              
+              // 로딩 바 보이기
+              //$('#loading-bar').show();
+              
+              getFuturePrice(selectedApartment, selectedArea);
+            });
+          },
+          complete: function () {
+            // 로딩 바 숨기기
+            //('#loading-bar').hide();
+          }
+        });
+      }
+
+
+    $(document).ready(function () {
+        initMap();
+        var isFirstLoad = true;
+        $('#searchBox').on('input', function () {
+            var searchTerm = $(this).val();
+            
+
+            if (searchTerm === '') {
+                $('#suggestionsList').empty();  // 검색어가 없을 때 추천 목록을 지움
+                //$('#suggestionsContainer').hide(); // 검색어가 없을 때 추천 목록 숨기기
+                return;
+            }
+
+            if (isFirstLoad) {
+                isFirstLoad = false;
+                return;
+            }
+
+            $.ajax({
+                type: 'POST',
+                url: '/search',
+                data: { 'searchTerm': searchTerm },
+                success: function (response) {
+                    var suggestions = response.suggestions;
+                    var html = '';
+
+                    for (var i = 0; i < suggestions.length; i++) {
+                        html += '<li>' + suggestions[i] + '</li>';
+                    }
+
+                    $('#suggestionsList').html(html);
+                }
+            });
+        });
+
+        $(document).on('click', '#suggestionsList li', function () {
+            var apartmentName = $(this).text();
+            $('#searchBox').val(apartmentName); // 아파트 이름을 검색 창에 입력
+
+            getArea(apartmentName); //미래가격 표시
+
+            $('#suggestionsContainer').hide(); // 추천 목록 숨기기
+        });
+
+    });
+
+    $(document).on('click', '#searchBox', function () {
+        $('#suggestionsContainer').show(); // 검색 창 클릭 시 추천 목록 보이기
+    });
+
+    $(document).on('click', '#suggestionsList li', function () {
+        var apartmentName = $(this).text();
+
+        $.ajax({
+            type: 'POST',
+            url: '/get_coordinates',
+            data: { 'apartmentName': apartmentName },
+            success: function (response) {
+                var latitude = response.latitude;
+                var longitude = response.longitude;
+
+                moveMapToCoordinates(latitude, longitude);
+                map.setZoom(17);
+            }
+        });
+    });
+
+    function moveMapToCoordinates(latitude, longitude) {
+
+        var position = new naver.maps.LatLng(latitude, longitude);
+        map.setCenter(position);
+        //map.setZoom(17);
+        //marker.setPosition(position);
+
+    }
+
+</script>
+
+</head>
+<body>
+    
+    <div id="map"></div>
+
+    <div id="searchContainer">
+        <input type="text" id="searchBox" placeholder="Search apartment">
+        <button id="closeButton" style="display: none;">x</button>
+    </div>
+
+    <div id="suggestionsContainer">
+        <ul id="suggestionsList"></ul>
+    </div>
+
+    <div id="priceInfo">
+        <img id="graphImage" alt="Predicted Price for the Next 4 Years">
+    </div>
+    
+    <div id="area-buttons">
+    </div>
+
+    <div id="loading-bar" style="display: none;">
+        <div id="loading-progress"></div>
+      </div>
+
+
+
+    <script>
+        
+    </script>
+</body>
+</html>
