@@ -185,20 +185,20 @@
     }
 
     function addMarker(position) {
-        var markerOptions = {
-            icon: {
-                content: '<div style="background-color: #5963D9; font-family: NanumGothic; width: fit-content; padding: 8px; box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); height: auto; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (map.getZoom() > 15 ? '<span style="font-weight: 400; font-size: 12px; display: block; text-align: center;">' + position['전용면적(㎡)'].toFixed(2) + '㎡</span><span>' + (position['거래금액(만원)'] / 10000).toFixed(1) + '억</span>' : position.name) + '</div>',
-                size: new naver.maps.Size(60, 40),
-                anchor: new naver.maps.Point(30, 20)
-            },
+        var marker = new naver.maps.Marker({
             position: new naver.maps.LatLng(position.y, position.x),
-            map: map
-        };
+            map: map,
+            icon: {
+              content: '<div style="background-color: #5963D9; font-family: NanumGothic; width: fit-content; padding: 8px; box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); height: auto; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (map.getZoom() > 15 ? '<span style="font-weight: 400; font-size: 12px; display: block; text-align: center;">' + position['전용면적(㎡)'].toFixed(2) + '㎡</span><span>' + (position['거래금액(만원)'] / 10000).toFixed(1) + '억</span>' : position.name) + '</div>',
+              size: new naver.maps.Size(60, 40),
+              anchor: new naver.maps.Point(30, 20)
+            },
+            //animation: naver.maps.Animation.DROP // 애니메이션을 적용하는 부분 추가
+          });
     
-        var marker = new naver.maps.Marker(markerOptions);
+        //var marker = new naver.maps.Marker(markerOptions);
         var apartmentName = position.단지명;
-        console.log(position.단지명)
-        
+        //console.log(position.단지명)
         var infowindow = new naver.maps.InfoWindow({
             content: '<div style="background-color: #fff; font-family: NanumGothic; padding: 10px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); font-size: 14px; font-weight: 600; color: #333; border: 1px solid #ccc;">' + (map.getZoom() > 15 ? position.단지명 : ((map.getZoom() > 12 && map.getZoom() <= 15) ? position.name : position.si)) + '</div>',
             disableAnchor: true,
@@ -213,10 +213,13 @@
             infowindow.close();
         });
     
+        
         naver.maps.Event.addListener(marker, 'click', function () {
+            infowindow.close();
+            var movingMarker = null;
             if (map.getZoom() > 15) {
                 
-                console.log()
+                //console.log(movingMarker)
                 getArea(apartmentName);
                 moveMapToCoordinates(position.y, position.x);
             }
